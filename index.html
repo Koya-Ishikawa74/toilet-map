@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#fff7f9">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="トイレマップ">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%23f6c9d6'/%3E%3Ctext x='50' y='68' font-size='56' text-anchor='middle'%3E%F0%9F%9A%BB%3C/text%3E%3C/svg%3E">
+<title>綺麗・安心トイレマップ</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+:root{--pink:#f6c9d6;--pink-d:#d9607f;--mint:#bfe7d5;--mint-d:#2f8a69;--ink:#3a2f33;--sub:#8a7a80;--bg:#fffafb;--line:#f0dfe5}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0}
+body{display:flex;flex-direction:column;background:var(--bg);color:var(--ink);font:15px/1.5 "Hiragino Maru Gothic ProN","Yu Gothic",system-ui,sans-serif;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+:focus-visible{outline:3px solid var(--pink-d);outline-offset:2px}
+header{padding:10px 12px 6px;display:flex;gap:8px;align-items:center}
+.areas{display:flex;flex:1;background:var(--pink);border-radius:999px;padding:4px;gap:4px}
+.areas button{flex:1;min-height:44px;border-radius:999px;font-weight:700;color:#8a4a5d}
+.areas button[aria-pressed=true]{background:#fff;color:var(--pink-d);box-shadow:0 1px 4px #d9607f33}
+.gps{width:52px;height:52px;border-radius:50%;background:var(--mint);font-size:22px;flex:none}
+.filters{display:flex;gap:6px;padding:4px 12px 8px;overflow-x:auto;scrollbar-width:none}
+.chip{flex:none;min-height:40px;padding:0 14px;border-radius:999px;border:1.5px solid var(--line);background:#fff;font-size:14px;white-space:nowrap}
+.chip[aria-pressed=true]{background:var(--mint);border-color:var(--mint-d);color:#1d5c45;font-weight:700}
+#wrap{position:relative;flex:1;min-height:0}
+#map{position:absolute;inset:0}
+.pin{width:34px;height:34px;border-radius:50% 50% 50% 4px;transform:rotate(-45deg);display:grid;place-items:center;border:2.5px solid #fff;box-shadow:0 2px 6px #0003}
+.pin span{transform:rotate(45deg);font-size:16px}
+.lbl{background:#fff;border:1.5px solid var(--pink);color:#b8456a;font-weight:700;font-size:12px;border-radius:999px;padding:1px 9px;box-shadow:0 1px 4px #d9607f33}
+.lbl:before{display:none}
+.nolbl .lbl{display:none}
+.pin.hi{background:var(--mint)}.pin.lo{background:var(--pink)}
+.fab{position:absolute;right:12px;bottom:14px;z-index:500;min-height:52px;padding:0 20px;border-radius:999px;background:var(--pink-d);color:#fff;font-weight:700;box-shadow:0 3px 10px #d9607f66}
+.tools{position:absolute;left:12px;bottom:14px;z-index:500;display:flex;gap:6px}
+.tools button{min-height:40px;padding:0 12px;border-radius:999px;background:#fffd;border:1px solid var(--line);font-size:13px}
+.count{position:absolute;left:12px;top:10px;z-index:500;background:#fffe;border-radius:999px;padding:3px 12px;font-size:13px;color:var(--sub)}
+#toast{position:absolute;left:50%;top:48px;transform:translateX(-50%);z-index:900;background:var(--ink);color:#fff;padding:8px 16px;border-radius:12px;font-size:14px;max-width:88%;text-align:center;display:none}
+#ad{display:none;height:56px;background:#f4eef0;color:var(--sub);align-items:center;justify-content:center;font-size:12px;border-top:1px dashed #d8c8cf}
+.leaflet-popup-content{margin:12px 14px;min-width:200px;font:14px/1.5 inherit}
+.pn{font-weight:700;font-size:16px}.pf{color:var(--sub);font-size:13px}
+.stars{color:#f0a020;letter-spacing:1px;font-size:17px}
+.tg{display:inline-block;margin:2px 3px 2px 0;padding:1px 9px;border-radius:999px;background:#e5f6ee;color:#1d5c45;font-size:12px}
+.memo{margin:6px 0;padding:6px 8px;background:#fff3f6;border-radius:8px;font-size:13px}
+.sample{display:inline-block;padding:0 8px;border-radius:6px;background:#fdebc8;color:#8a5a00;font-size:11px;margin-left:4px}
+.act{display:flex;gap:6px;margin-top:6px}
+.act button{flex:1;min-height:40px;border-radius:10px;background:#f6eef1}
+.act .del{color:#b0304e}
+#sheet{position:fixed;inset:0;z-index:2000;display:none;background:#0006;align-items:flex-end}
+#sheet.on{display:flex}
+#sheet form{width:100%;max-height:92dvh;overflow:auto;background:#fff;border-radius:22px 22px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px))}
+#sheet h2{margin:0 0 10px;font-size:18px}
+label{display:block;margin:10px 0 4px;font-size:13px;color:var(--sub)}
+input[type=text],select,textarea{width:100%;min-height:46px;padding:8px 12px;border:1.5px solid var(--line);border-radius:12px;font:inherit;background:#fff}
+textarea{min-height:76px}
+input,select,textarea{font-size:16px}
+.tagsel{display:flex;flex-wrap:wrap;gap:6px}
+.tagsel label{margin:0;display:inline-flex;align-items:center;gap:6px;min-height:42px;padding:0 12px;border:1.5px solid var(--line);border-radius:999px;font-size:14px;color:var(--ink)}
+.tagsel input{width:18px;height:18px;accent-color:var(--mint-d)}
+.btns{display:flex;gap:8px;margin-top:16px}
+.btns button{flex:1;min-height:50px;border-radius:14px;font-weight:700;background:#f3ecef}
+.btns .ok{background:var(--pink-d);color:#fff;flex:2}
+@media (min-width:900px){
+ header,.filters{max-width:900px;width:100%;margin:0 auto}
+ .filters{flex-wrap:wrap;overflow:visible}
+ .chip,.areas button,.fab{transition:background .15s}
+ .chip:hover{background:#f7eef1}.chip[aria-pressed=true]:hover{background:#aee0cb}
+ #sheet{align-items:center;justify-content:center}
+ #sheet form{width:480px;border-radius:22px;max-height:88dvh}
+}
+@media (prefers-reduced-motion:no-preference){#toast{animation:f .2s}@keyframes f{from{opacity:0}}}
+</style>
+</head>
+<body>
+<header>
+  <div class="areas" role="group" aria-label="エリア切り替え">
+    <button data-area="funabashi" aria-pressed="true">船橋エリア</button>
+    <button data-area="goko" aria-pressed="false">五香エリア</button>
+  </div>
+  <button class="gps" id="gps" aria-label="現在地に移動">📍</button>
+</header>
+<div class="filters" id="filters"></div>
+<div id="wrap">
+  <div id="map"></div>
+  <div class="count" id="count"></div>
+  <div id="toast" role="status"></div>
+  <div class="tools"><button id="exp">書き出し</button><button id="imp">読み込み</button></div>
+  <button class="fab" id="add">＋ トイレを追加</button>
+</div>
+<div id="ad">広告スペース（将来用）</div>
+
+<div id="sheet" role="dialog" aria-modal="true" aria-labelledby="st">
+  <form id="form">
+    <h2 id="st">トイレを追加</h2>
+    <label for="f-name">施設名</label>
+    <input type="text" id="f-name" required maxlength="40" placeholder="例：東武百貨店 船橋店">
+    <label for="f-floor">階数</label>
+    <input type="text" id="f-floor" maxlength="10" placeholder="例：4F">
+    <label for="f-rate">清潔度</label>
+    <select id="f-rate"></select>
+    <label>設備</label>
+    <div class="tagsel" id="f-tags"></div>
+    <label for="f-memo">ひとこと安心メモ</label>
+    <textarea id="f-memo" maxlength="120" placeholder="例：清掃頻度が高く、4階以上は空いていて穴場"></textarea>
+    <div class="btns"><button type="button" id="cancel">キャンセル</button><button type="submit" class="ok">保存する</button></div>
+  </form>
+</div>
+<div id="ad-flag" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+const SHOW_AD_SLOT = false; // 広告枠を出すときは true に
+const KEY = 'cleanToiletMap.v1';
+const TAGS = ['便座除菌スプレーあり','パウダールーム併設','洋式のみ','タッチレス/自動流し'];
+const AREAS = {funabashi:{c:[35.7013,139.9850],z:17}, goko:{c:[35.7917,139.9505],z:17}};
+// 初期データは仮データ（sample:true）。編集して保存すると「確認済み」になる
+const SEED = [
+ {id:'s1',name:'東武百貨店 船橋店',floor:'4F',lat:35.7019,lng:139.9845,rate:5,tags:[TAGS[0],TAGS[1],TAGS[3]],memo:'デパート品質で清掃回数が多く超清潔。4階以上がおすすめ。',sample:true},
+ {id:'s2',name:'シャポー船橋（南館）',floor:'',lat:35.7008,lng:139.9849,rate:4.5,tags:[TAGS[0]],memo:'駅直結で綺麗。メイクスペースあり、女性用設備が充実。',sample:true},
+ {id:'s3',name:'船橋FACE（フェイス）',floor:'3〜4F',lat:35.7001,lng:139.9856,rate:4,tags:[TAGS[0]],memo:'複合ビルで比較的綺麗。多目的トイレあり。3〜4Fが狙い目。',sample:true},
+ {id:'s4',name:'プラザgoko（五香駅ビル）',floor:'',lat:35.7917,lng:139.9505,rate:3.5,tags:[TAGS[2]],memo:'駅近で緊急時に便利。',sample:true}
+];
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let places = load(), area = 'funabashi', minStar = false, tagFilter = new Set(), addMode = false, editing = null, pending = null;
+
+function load(){
+  try { const v = JSON.parse(localStorage.getItem(KEY)); if (Array.isArray(v)) return v; } catch(e){}
+  return JSON.parse(JSON.stringify(SEED));
+}
+function save(){ try { localStorage.setItem(KEY, JSON.stringify(places)); } catch(e){ toast('この環境では保存できません'); } }
+function toast(t){ const e=$('toast'); e.textContent=t; e.style.display='block'; clearTimeout(toast.t); toast.t=setTimeout(()=>e.style.display='none',2600); }
+function stars(r){ const f=Math.floor(r), h=r%1>=.5; return '★'.repeat(f)+(h?'☆':'')+' <small>'+r.toFixed(1)+'</small>'; }
+
+const map = L.map('map',{zoomControl:false}).setView(AREAS.funabashi.c, AREAS.funabashi.z);
+L.control.zoom({position:'topright'}).addTo(map);
+// 国土地理院の淡色地図（無料・APIキー不要・file://でも表示可）。出典表示は必須
+const gsi=(t,ext)=>L.tileLayer(`https://cyberjapandata.gsi.go.jp/xyz/${t}/{z}/{x}/{y}.${ext}`,{minZoom:5,maxZoom:18,attribution:'<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener">地理院タイル</a>'});
+// CARTOの地図を使う場合は、無料のAPIキーを https://www.carto.com/basemaps/apikey で取得してここに貼る（空のままなら地理院の標準地図を使用）
+const CARTO_KEY = 'cb1_4vov_1_ee17a9ab274560c5bf023a4c';
+const gsiStd=gsi('std','png');
+const base={'標準（地理院）':gsiStd,'淡色（地理院）':gsi('pale','png'),'航空写真':gsi('seamlessphoto','jpg')};
+if(CARTO_KEY){
+  const soft=L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key='+encodeURIComponent(CARTO_KEY),{subdomains:'abcd',maxZoom:19,attribution:'© OpenStreetMap contributors © CARTO'}).addTo(map);
+  base['やさしい（CARTO）']=soft;
+}else{ gsiStd.addTo(map); }
+L.control.layers(base,null,{position:'topright',collapsed:true}).addTo(map);
+const layer = L.layerGroup().addTo(map);
+const syncLbl=()=>$('map').classList.toggle('nolbl',map.getZoom()<16);
+map.on('zoomend',syncLbl); syncLbl();
+
+function popup(p){
+  return `<div class="pn">${esc(p.name)}${p.sample?'<span class="sample">仮データ</span>':''}</div>`+
+    (p.floor?`<div class="pf">${esc(p.floor)}</div>`:'')+
+    `<div class="stars" aria-label="清潔度 ${p.rate}">${stars(p.rate)}</div>`+
+    `<div>${p.tags.map(t=>`<span class="tg">${esc(t)}</span>`).join('')}</div>`+
+    (p.memo?`<div class="memo">${esc(p.memo)}</div>`:'')+
+    `<div class="act"><button onclick="editPlace('${p.id}')">編集</button><button class="del" onclick="delPlace('${p.id}')">削除</button></div>`;
+}
+function render(){
+  layer.clearLayers();
+  const list = places.filter(p => (!minStar || p.rate>=4) && [...tagFilter].every(t=>p.tags.includes(t)));
+  list.forEach(p=>{
+    const icon = L.divIcon({className:'',iconSize:[34,34],iconAnchor:[17,34],popupAnchor:[0,-34],tooltipAnchor:[0,2],
+      html:`<div class="pin ${p.rate>=4?'hi':'lo'}"><span>🚻</span></div>`});
+    L.marker([p.lat,p.lng],{icon,title:p.name}).bindPopup(popup(p)).bindTooltip(esc(p.name),{permanent:true,direction:'bottom',className:'lbl'}).addTo(layer);
+  });
+  $('count').textContent = list.length+'件表示中';
+}
+function buildFilters(){
+  const box=$('filters');
+  const mk=(label,on,fn)=>{const b=document.createElement('button');b.className='chip';b.textContent=label;b.setAttribute('aria-pressed',on);b.onclick=()=>{const v=b.getAttribute('aria-pressed')!=='true';b.setAttribute('aria-pressed',v);fn(v);render();};box.appendChild(b);};
+  mk('★4以上',false,v=>minStar=v);
+  TAGS.forEach(t=>mk(t,false,v=>v?tagFilter.add(t):tagFilter.delete(t)));
+}
+document.querySelectorAll('.areas button').forEach(b=>b.onclick=()=>{
+  area=b.dataset.area;
+  document.querySelectorAll('.areas button').forEach(x=>x.setAttribute('aria-pressed',x===b));
+  map.setView(AREAS[area].c,AREAS[area].z);
+});
+
+// 現在地
+let me=null;
+$('gps').onclick=()=>{ toast('現在地を取得中…'); map.locate({setView:true,maxZoom:17,enableHighAccuracy:true}); };
+map.on('locationfound',e=>{ if(me) me.remove(); me=L.circleMarker(e.latlng,{radius:9,color:'#fff',weight:3,fillColor:'#3b82f6',fillOpacity:1}).addTo(map); toast('現在地に移動しました'); });
+map.on('locationerror',()=>toast('現在地を取得できません。位置情報の許可とhttps接続を確認してください'));
+
+// 追加・編集
+$('f-rate').innerHTML=[5,4.5,4,3.5,3,2.5,2,1.5,1].map(v=>`<option value="${v}">${'★'.repeat(Math.floor(v))}${v%1?'☆':''} ${v.toFixed(1)}</option>`).join('');
+$('f-tags').innerHTML=TAGS.map((t,i)=>`<label><input type="checkbox" value="${esc(t)}">${esc(t)}</label>`).join('');
+function openSheet(p, ll){
+  editing = p; pending = ll;
+  $('st').textContent = p ? 'トイレを編集' : 'トイレを追加';
+  $('f-name').value = p?p.name:''; $('f-floor').value = p?p.floor:'';
+  $('f-rate').value = p?p.rate:4; $('f-memo').value = p?p.memo:'';
+  document.querySelectorAll('#f-tags input').forEach(i=>i.checked = !!p && p.tags.includes(i.value));
+  $('sheet').classList.add('on'); setTimeout(()=>$('f-name').focus(),50);
+}
+function closeSheet(){ $('sheet').classList.remove('on'); editing=null; pending=null; }
+$('cancel').onclick=closeSheet;
+$('sheet').addEventListener('click',e=>{ if(e.target===$('sheet')) closeSheet(); });
+$('add').onclick=()=>{ addMode=!addMode; $('add').textContent=addMode?'キャンセル':'＋ トイレを追加'; document.getElementById('map').style.cursor=addMode?'crosshair':''; if(addMode) toast('地図をタップして、トイレの場所を選んでください'); };
+map.on('click',e=>{ if(!addMode) return; addMode=false; $('add').textContent='＋ トイレを追加'; openSheet(null,e.latlng); });
+$('form').onsubmit=e=>{
+  e.preventDefault();
+  const data={name:$('f-name').value.trim(),floor:$('f-floor').value.trim(),rate:parseFloat($('f-rate').value),memo:$('f-memo').value.trim(),
+    tags:[...document.querySelectorAll('#f-tags input:checked')].map(i=>i.value),sample:false};
+  if(!data.name) return;
+  if(editing) Object.assign(editing,data);
+  else places.push({id:'u'+Date.now(),lat:pending.lat,lng:pending.lng,...data});
+  save(); render(); closeSheet(); map.closePopup(); toast('保存しました');
+};
+window.editPlace=id=>{ const p=places.find(x=>x.id===id); if(p){ map.closePopup(); openSheet(p); } };
+window.delPlace=id=>{ const p=places.find(x=>x.id===id); if(p && confirm('「'+p.name+'」を削除しますか？')){ places=places.filter(x=>x.id!==id); save(); render(); } };
+
+// 書き出し・読み込み（スマホ間でデータを共有するため）
+$('exp').onclick=async()=>{
+  const j=JSON.stringify(places);
+  try{ await navigator.clipboard.writeText(j); toast('データをコピーしました。LINEなどで送れます'); }
+  catch(e){ prompt('このテキストをコピーしてください',j); }
+};
+$('imp').onclick=()=>{
+  const t=prompt('書き出したデータを貼り付けてください（今のデータは置き換わります）');
+  if(!t) return;
+  try{ const v=JSON.parse(t); if(!Array.isArray(v)||v.some(p=>typeof p.lat!=='number'||typeof p.lng!=='number'||!p.name)) throw 0;
+    places=v.map(p=>({id:String(p.id||'u'+Math.random()),name:String(p.name),floor:String(p.floor||''),lat:p.lat,lng:p.lng,rate:Number(p.rate)||3,tags:(p.tags||[]).filter(t=>TAGS.includes(t)),memo:String(p.memo||''),sample:!!p.sample}));
+    save(); render(); toast('読み込みました'); }
+  catch(e){ toast('データの形式が正しくありません'); }
+};
+
+if(SHOW_AD_SLOT) $('ad').style.display='flex';
+buildFilters(); render();
+</script>
+</body>
+</html>
