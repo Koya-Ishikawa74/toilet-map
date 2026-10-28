@@ -48,10 +48,10 @@ header{padding:10px 12px 6px;display:flex;gap:8px;align-items:center}
 .act{display:flex;gap:6px;margin-top:6px}
 .act button{flex:1;min-height:40px;border-radius:10px;background:#f6eef1}
 .act .del{color:#b0304e}
-#sheet{position:fixed;inset:0;z-index:2000;display:none;background:#0006;align-items:flex-end}
-#sheet.on{display:flex}
-#sheet form{width:100%;max-height:92dvh;overflow:auto;background:#fff;border-radius:22px 22px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px))}
-#sheet h2{margin:0 0 10px;font-size:18px}
+.ov{position:fixed;inset:0;z-index:2000;display:none;background:#0006;align-items:flex-end}
+.ov.on{display:flex}
+.ov form{width:100%;max-height:92dvh;overflow:auto;background:#fff;border-radius:22px 22px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px))}
+.ov h2{margin:0 0 10px;font-size:18px}
 label{display:block;margin:10px 0 4px;font-size:13px;color:var(--sub)}
 input[type=text],select,textarea{width:100%;min-height:46px;padding:8px 12px;border:1.5px solid var(--line);border-radius:12px;font:inherit;background:#fff}
 textarea{min-height:76px}
@@ -67,10 +67,17 @@ input,select,textarea{font-size:16px}
  .filters{flex-wrap:wrap;overflow:visible}
  .chip,.areas button,.fab{transition:background .15s}
  .chip:hover{background:#f7eef1}.chip[aria-pressed=true]:hover{background:#aee0cb}
- #sheet{align-items:center;justify-content:center}
- #sheet form{width:480px;border-radius:22px;max-height:88dvh}
+ .ov{align-items:center;justify-content:center}
+ .ov form{width:480px;border-radius:22px;max-height:88dvh}
 }
 @media (prefers-reduced-motion:no-preference){#toast{animation:f .2s}@keyframes f{from{opacity:0}}}
+
+.tools{flex-direction:column;align-items:flex-start}
+.tools .pri{background:var(--pink-d);color:#fff;border:0;font-weight:700;min-height:46px;box-shadow:0 3px 10px #d9607f66}
+.tools button[aria-pressed=true]{background:var(--mint);border-color:var(--mint-d);color:#1d5c45;font-weight:700}
+.act{flex-wrap:wrap}.act button{flex:1 1 40%}
+.nrow{display:flex;justify-content:space-between;gap:10px;width:100%;min-height:58px;padding:8px 4px;border-bottom:1px solid var(--line);text-align:left;align-items:center}
+.nrow b{display:block}.nrow small{color:var(--sub)}.nrow .min{font-weight:700;color:var(--pink-d);white-space:nowrap}
 </style>
 </head>
 <body>
@@ -86,12 +93,12 @@ input,select,textarea{font-size:16px}
   <div id="map"></div>
   <div class="count" id="count"></div>
   <div id="toast" role="status"></div>
-  <div class="tools"><button id="exp">書き出し</button><button id="imp">読み込み</button></div>
+  <div class="tools"><button class="pri" id="near">🚶 近くのトイレ</button><button id="cov" aria-pressed="false">🟢 トイレの多い・少ないエリア</button><button id="exp">書き出し</button><button id="imp">読み込み</button></div>
   <button class="fab" id="add">＋ トイレを追加</button>
 </div>
 <div id="ad">広告スペース（将来用）</div>
 
-<div id="sheet" role="dialog" aria-modal="true" aria-labelledby="st">
+<div id="sheet" class="ov" role="dialog" aria-modal="true" aria-labelledby="st">
   <form id="form">
     <h2 id="st">トイレを追加</h2>
     <label for="f-name">施設名</label>
@@ -107,13 +114,28 @@ input,select,textarea{font-size:16px}
     <div class="btns"><button type="button" id="cancel">キャンセル</button><button type="submit" class="ok">保存する</button></div>
   </form>
 </div>
+<div id="rsheet" class="ov" role="dialog" aria-modal="true"><form id="rform">
+  <h2 id="rt">口コミ</h2>
+  <div class="tagsel" id="r-checks">
+    <label><input type="checkbox" name="c">掃除が行き届いている</label>
+    <label><input type="checkbox" name="s">ハンドソープあり</label>
+    <label><input type="checkbox" name="l">便座の蓋あり</label>
+  </div>
+  <label for="r-odor">匂い</label>
+  <select id="r-odor"><option value="0">気にならない</option><option value="1">少し気になる</option><option value="2">強め</option></select>
+  <div class="btns"><button type="button" id="rcancel">キャンセル</button><button type="submit" class="ok">送信（+10pt）</button></div>
+</form></div>
+<div id="nsheet" class="ov" role="dialog" aria-modal="true"><form onsubmit="return false">
+  <h2>近くのトイレ</h2><div id="nlist"></div>
+  <div class="btns"><button type="button" id="nclose">閉じる</button></div>
+</form></div>
 <div id="ad-flag" hidden></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 const SHOW_AD_SLOT = false; // 広告枠を出すときは true に
 const KEY = 'cleanToiletMap.v1';
-const TAGS = ['便座除菌スプレーあり','パウダールーム併設','洋式のみ','タッチレス/自動流し'];
+const TAGS = ['便座除菌スプレーあり','パウダールーム併設','洋式のみ','タッチレス/自動流し','ハンドソープあり','買い物なしで使える','生理用品の自販機','おむつ交換台あり'];
 const AREAS = {funabashi:{c:[35.7013,139.9850],z:17}, goko:{c:[35.7917,139.9505],z:17}};
 // 初期データは仮データ（sample:true）。編集して保存すると「確認済み」になる
 const SEED = [
@@ -122,8 +144,11 @@ const SEED = [
  {id:'s3',name:'船橋FACE（フェイス）',floor:'3〜4F',lat:35.7001,lng:139.9856,rate:4,tags:[TAGS[0]],memo:'複合ビルで比較的綺麗。多目的トイレあり。3〜4Fが狙い目。',sample:true},
  {id:'s4',name:'プラザgoko（五香駅ビル）',floor:'',lat:35.7917,lng:139.9505,rate:3.5,tags:[TAGS[2]],memo:'駅近で緊急時に便利。',sample:true}
 ];
+SEED.forEach(p=>p.tags.push(TAGS[5])); // 駅ビル等は買い物不要の想定（仮データ。実際に確認して編集すること）
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let pts=0; try{pts=+localStorage.getItem(KEY+'.pts')||0;}catch(e){}
+let favOnly=false, cov=false, nearMode=false;
 let places = load(), area = 'funabashi', minStar = false, tagFilter = new Set(), addMode = false, editing = null, pending = null;
 
 function load(){
@@ -147,6 +172,8 @@ if(CARTO_KEY){
   base['やさしい（CARTO）']=soft;
 }else{ gsiStd.addTo(map); }
 L.control.layers(base,null,{position:'topright',collapsed:true}).addTo(map);
+const covLayer = L.layerGroup().addTo(map);
+const markers = {};
 const layer = L.layerGroup().addTo(map);
 const syncLbl=()=>$('map').classList.toggle('nolbl',map.getZoom()<16);
 map.on('zoomend',syncLbl); syncLbl();
@@ -157,22 +184,24 @@ function popup(p){
     `<div class="stars" aria-label="清潔度 ${p.rate}">${stars(p.rate)}</div>`+
     `<div>${p.tags.map(t=>`<span class="tg">${esc(t)}</span>`).join('')}</div>`+
     (p.memo?`<div class="memo">${esc(p.memo)}</div>`:'')+
-    `<div class="act"><button onclick="editPlace('${p.id}')">編集</button><button class="del" onclick="delPlace('${p.id}')">削除</button></div>`;
+    rvSummary(p)+`<div class="act"><button onclick="toggleFav('${p.id}')">${p.fav?'♥ お気に入り解除':'♡ お気に入り'}</button><button onclick="reviewPlace('${p.id}')">口コミを書く</button><button onclick="editPlace('${p.id}')">編集</button><button class="del" onclick="delPlace('${p.id}')">削除</button></div>`;
 }
 function render(){
-  layer.clearLayers();
-  const list = places.filter(p => (!minStar || p.rate>=4) && [...tagFilter].every(t=>p.tags.includes(t)));
+  layer.clearLayers(); covLayer.clearLayers();
+  const list = places.filter(visible);
+  if(cov) list.forEach(p=>L.circle([p.lat,p.lng],{radius:250,stroke:false,fillColor:'#2f8a69',fillOpacity:.16,interactive:false}).addTo(covLayer));
   list.forEach(p=>{
     const icon = L.divIcon({className:'',iconSize:[34,34],iconAnchor:[17,34],popupAnchor:[0,-34],tooltipAnchor:[0,2],
-      html:`<div class="pin ${p.rate>=4?'hi':'lo'}"><span>🚻</span></div>`});
-    L.marker([p.lat,p.lng],{icon,title:p.name}).bindPopup(popup(p)).bindTooltip(esc(p.name),{permanent:true,direction:'bottom',className:'lbl'}).addTo(layer);
+      html:`<div class="pin ${p.rate>=4?'hi':'lo'}"><span>${p.fav?'💗':'🚻'}</span></div>`});
+    markers[p.id]=L.marker([p.lat,p.lng],{icon,title:p.name}).bindPopup(popup(p)).bindTooltip(esc(p.name),{permanent:true,direction:'bottom',className:'lbl'}).addTo(layer);
   });
-  $('count').textContent = list.length+'件表示中';
+  $('count').textContent = list.length+'件表示中　⭐'+pts+'pt';
 }
 function buildFilters(){
   const box=$('filters');
   const mk=(label,on,fn)=>{const b=document.createElement('button');b.className='chip';b.textContent=label;b.setAttribute('aria-pressed',on);b.onclick=()=>{const v=b.getAttribute('aria-pressed')!=='true';b.setAttribute('aria-pressed',v);fn(v);render();};box.appendChild(b);};
   mk('★4以上',false,v=>minStar=v);
+  mk('♥ お気に入り',false,v=>favOnly=v);
   TAGS.forEach(t=>mk(t,false,v=>v?tagFilter.add(t):tagFilter.delete(t)));
 }
 document.querySelectorAll('.areas button').forEach(b=>b.onclick=()=>{
@@ -184,7 +213,7 @@ document.querySelectorAll('.areas button').forEach(b=>b.onclick=()=>{
 // 現在地
 let me=null;
 $('gps').onclick=()=>{ toast('現在地を取得中…'); map.locate({setView:true,maxZoom:17,enableHighAccuracy:true}); };
-map.on('locationfound',e=>{ if(me) me.remove(); me=L.circleMarker(e.latlng,{radius:9,color:'#fff',weight:3,fillColor:'#3b82f6',fillOpacity:1}).addTo(map); toast('現在地に移動しました'); });
+map.on('locationfound',e=>{ if(me) me.remove(); me=L.circleMarker(e.latlng,{radius:9,color:'#fff',weight:3,fillColor:'#3b82f6',fillOpacity:1}).addTo(map); if(!nearMode) toast('現在地に移動しました'); });
 map.on('locationerror',()=>toast('現在地を取得できません。位置情報の許可とhttps接続を確認してください'));
 
 // 追加・編集
@@ -225,10 +254,36 @@ $('imp').onclick=()=>{
   const t=prompt('書き出したデータを貼り付けてください（今のデータは置き換わります）');
   if(!t) return;
   try{ const v=JSON.parse(t); if(!Array.isArray(v)||v.some(p=>typeof p.lat!=='number'||typeof p.lng!=='number'||!p.name)) throw 0;
-    places=v.map(p=>({id:String(p.id||'u'+Math.random()),name:String(p.name),floor:String(p.floor||''),lat:p.lat,lng:p.lng,rate:Number(p.rate)||3,tags:(p.tags||[]).filter(t=>TAGS.includes(t)),memo:String(p.memo||''),sample:!!p.sample}));
+    places=v.map(p=>({id:String(p.id||'u'+Math.random()),name:String(p.name),floor:String(p.floor||''),lat:p.lat,lng:p.lng,rate:Number(p.rate)||3,tags:(p.tags||[]).filter(t=>TAGS.includes(t)),memo:String(p.memo||''),sample:!!p.sample,fav:!!p.fav,reviews:Array.isArray(p.reviews)?p.reviews.filter(r=>r&&typeof r==='object'):[]}));
     save(); render(); toast('読み込みました'); }
   catch(e){ toast('データの形式が正しくありません'); }
 };
+
+const visible=p=>(!minStar||p.rate>=4)&&(!favOnly||p.fav)&&[...tagFilter].every(t=>p.tags.includes(t));
+const pct=(a,k)=>Math.round(a.filter(r=>r[k]).length/a.length*100);
+function rvSummary(p){const a=p.reviews||[];if(!a.length)return '';const o=a.reduce((n,r)=>n+r.o,0)/a.length;
+  return `<div class="memo">口コミ ${a.length}件<br>掃除が行き届いている ${pct(a,'c')}％ ／ ハンドソープあり ${pct(a,'s')}％ ／ 便座の蓋あり ${pct(a,'l')}％<br>匂い：${['気にならない','少し気になる','強め'][Math.round(o)]}</div>`;}
+window.toggleFav=id=>{const p=places.find(x=>x.id===id);if(p){p.fav=!p.fav;save();render();map.closePopup();toast(p.fav?'お気に入りに追加しました':'お気に入りを解除しました');}};
+let rid=null;
+window.reviewPlace=id=>{const p=places.find(x=>x.id===id);if(!p)return;rid=id;$('rt').textContent='口コミ：'+p.name;document.querySelectorAll('#r-checks input').forEach(i=>i.checked=false);$('r-odor').value='0';map.closePopup();$('rsheet').classList.add('on');};
+$('rcancel').onclick=()=>$('rsheet').classList.remove('on');
+$('rform').onsubmit=e=>{e.preventDefault();const p=places.find(x=>x.id===rid);if(!p)return;const c=k=>document.querySelector('#r-checks [name='+k+']').checked;
+  (p.reviews=p.reviews||[]).push({c:c('c'),s:c('s'),l:c('l'),o:+$('r-odor').value,t:Date.now()});pts+=10;
+  try{localStorage.setItem(KEY+'.pts',pts);}catch(e){} save();render();$('rsheet').classList.remove('on');toast('口コミありがとう！ +10pt（合計'+pts+'pt）');};
+// 近くのトイレ（現在地から近い順）
+$('near').onclick=()=>{nearMode=true;toast('現在地を取得中…');map.locate({enableHighAccuracy:true});};
+map.on('locationfound',e=>{if(nearMode){nearMode=false;showNear(e.latlng);}});
+map.on('locationerror',()=>{nearMode=false;});
+function showNear(ll){
+  const list=places.filter(visible).map(p=>({p,d:map.distance(ll,[p.lat,p.lng])})).sort((a,b)=>a.d-b.d).slice(0,5);
+  $('nlist').innerHTML=list.length?list.map((x,i)=>`<button type="button" class="nrow" data-i="${i}"><span><b>${esc(x.p.name)}${x.p.sample?'<span class="sample">仮データ</span>':''}</b><small>${esc(x.p.floor)} ${'★'.repeat(Math.floor(x.p.rate))} ・ ${x.d<1000?Math.round(x.d)+'m':(x.d/1000).toFixed(1)+'km'}</small></span><span class="min">徒歩約${Math.max(1,Math.ceil(x.d*1.3/80))}分</span></button>`).join('')+'<p class="pf">※直線距離から計算した目安です。登録済みの施設のみが対象です。</p>':'<p>条件に合うトイレがありません。絞り込みを解除してください。</p>';
+  $('nlist').querySelectorAll('.nrow').forEach(b=>b.onclick=()=>{const p=list[+b.dataset.i].p;$('nsheet').classList.remove('on');map.setView([p.lat,p.lng],18);setTimeout(()=>markers[p.id]&&markers[p.id].openPopup(),300);});
+  $('nsheet').classList.add('on');
+}
+$('nclose').onclick=()=>$('nsheet').classList.remove('on');
+// トイレの多い・少ないエリア（徒歩約3分＝250m圏を緑で重ねる）
+$('cov').onclick=()=>{cov=!cov;$('cov').setAttribute('aria-pressed',cov);render();if(cov)toast('緑が濃い＝トイレが多いエリア／色がない＝少ないエリア（登録済みの施設のみ）');};
+document.querySelectorAll('.ov').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('on');}));
 
 if(SHOW_AD_SLOT) $('ad').style.display='flex';
 buildFilters(); render();
